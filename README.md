@@ -87,95 +87,176 @@ If empty, show "No response".
 
 ```
 App.js
-
- import React, { useState } from "react";
-import "./App.css";
-
-const defaultCheckboxOptions = [
-  "Performance",
-  "Stability",
-  "User Interface",
-  "None",
-  "Other feature"
-];
+import React, { useState } from 'react';
+import './App.css';
 
 function App() {
-  const [mode, setMode] = useState("build");
+  const [mode, setMode] = useState('build');
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestion, setCurrentQuestion] = useState({ text: '', type: 'text', options: '' });
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [responses, setResponses] = useState({});
+  const [submitted, setSubmitted] = useState(false);
 
-  const [title, setTitle] = useState("Product Feedback Survey");
-  const [checkboxQuestion, setCheckboxQuestion] = useState(
-    "Which features do you value the most?"
-  );
-  const [checkboxOptions, setCheckboxOptions] = useState(defaultCheckboxOptions);
-  const [selectedOptions, setSelectedOptions] = useState([]);
+  const handleToggleMode = () => {
+    setMode(mode === 'build' ? 'fill' : 'build');
+    setSubmitted(false);
+  };
 
-  const submitSurvey = () => {
-    alert(`Submitted: ${selectedOptions.join(", ")}`);
-    setSelectedOptions([]);
+  const handleAddOrUpdateQuestion = () => {
+    if (!currentQuestion.text) return;
+
+    const newQuestion = {
+      ...currentQuestion,
+      options: currentQuestion.type !== 'text'
+        ? currentQuestion.options.split(',').map(opt => opt.trim())
+        : [],
+    };
+
+    if (editingIndex !== null) {
+      const updated = [...questions];
+      updated[editingIndex] = newQuestion;
+      setQuestions(updated);
+    } else {
+      setQuestions([...questions, newQuestion]);
+    }
+
+    setCurrentQuestion({ text: '', type: 'text', options: '' });
+    setEditingIndex(null);
+  };
+
+  const handleEdit = (index) => {
+    const q = questions[index];
+    setCurrentQuestion({
+      text: q.text,
+      type: q.type,
+      options: q.options.join(', ')
+    });
+    setEditingIndex(index);
+  };
+
+  const handleDelete = (index) => {
+    const updated = questions.filter((_, i) => i !== index);
+    setQuestions(updated);
+  };
+
+  const handleResponseChange = (index, value, option) => {
+    if (questions[index].type === 'checkbox') {
+      const current = responses[index] || [];
+      const updated = current.includes(option)
+        ? current.filter(o => o !== option)
+        : [...current, option];
+      setResponses({ ...responses, [index]: updated });
+    } else {
+      setResponses({ ...responses, [index]: value });
+    }
+  };
+
+  const handleSubmit = () => {
+    setSubmitted(true);
   };
 
   return (
-    <div className="app">
-      <button onClick={() => setMode(mode === "build" ? "fill" : "build")}>
-        Switch to {mode === "build" ? "Fill" : "Build"} Mode
+    <div className="App">
+      <h1>React Survey</h1>
+      <button onClick={handleToggleMode}>
+        Switch to {mode === 'build' ? 'Fill Mode' : 'Build Mode'}
       </button>
 
-      <h1>{title}</h1>
-
-      {mode === "build" ? (
-        <div className="build-mode">
-          <label>Survey Title:</label>
+      {mode === 'build' ? (
+        <div className="builder">
+          <h2>Build Survey</h2>
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="input"
+            type="text"
+            placeholder="Question text"
+            value={currentQuestion.text}
+            onChange={(e) => setCurrentQuestion({ ...currentQuestion, text: e.target.value })}
           />
-
-          <label>Question:</label>
-          <input
-            value={checkboxQuestion}
-            onChange={(e) => setCheckboxQuestion(e.target.value)}
-            className="input"
-          />
-
-          {checkboxOptions.map((opt, idx) => (
-            <input
-              key={idx}
-              value={opt}
-              onChange={(e) => {
-                const newOptions = [...checkboxOptions];
-                newOptions[idx] = e.target.value;
-                setCheckboxOptions(newOptions);
-              }}
-              className="input"
-            />
-          ))}
-          <button
-            onClick={() =>
-              setCheckboxOptions([...checkboxOptions, `item${checkboxOptions.length + 1}`])
-            }
+          <select
+            value={currentQuestion.type}
+            onChange={(e) => setCurrentQuestion({ ...currentQuestion, type: e.target.value })}
           >
-            Add Option
+            <option value="text">Text</option>
+            <option value="radio">Multiple Choice (Radio)</option>
+            <option value="checkbox">Checkboxes</option>
+          </select>
+          {(currentQuestion.type === 'radio' || currentQuestion.type === 'checkbox') && (
+            <input
+              type="text"
+              placeholder="Comma-separated options"
+              value={currentQuestion.options}
+              onChange={(e) => setCurrentQuestion({ ...currentQuestion, options: e.target.value })}
+            />
+          )}
+          <button onClick={handleAddOrUpdateQuestion}>
+            {editingIndex !== null ? 'Update' : 'Add'} Question
           </button>
+
+          <ul>
+            {questions.map((q, i) => (
+              <li key={i}>
+                <strong>{q.text}</strong> ({q.type})
+                <button onClick={() => handleEdit(i)}>Edit</button>
+                <button onClick={() => handleDelete(i)}>Delete</button>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : (
-        <div className="fill-mode">
-          <p>{checkboxQuestion}</p>
-          {checkboxOptions.map((opt, idx) => (
-            <div key={idx}>
-              <input
-                type="checkbox"
-                checked={selectedOptions.includes(opt)}
-                onChange={() =>
-                  setSelectedOptions((prev) =>
-                    prev.includes(opt) ? prev.filter((o) => o !== opt) : [...prev, opt]
-                  )
-                }
-              />
-              <label>{opt}</label>
+        <div className="filler">
+          <h2>Fill Survey</h2>
+          {questions.map((q, i) => (
+            <div key={i} className="question-block">
+              <p>{q.text}</p>
+              {q.type === 'text' && (
+                <input
+                  type="text"
+                  value={responses[i] || ''}
+                  onChange={(e) => handleResponseChange(i, e.target.value)}
+                />
+              )}
+              {q.type === 'radio' &&
+                q.options.map((opt, j) => (
+                  <label key={j}>
+                    <input
+                      type="radio"
+                      name={`question-${i}`}
+                      value={opt}
+                      checked={responses[i] === opt}
+                      onChange={() => handleResponseChange(i, opt)}
+                    />
+                    {opt}
+                  </label>
+                ))}
+              {q.type === 'checkbox' &&
+                q.options.map((opt, j) => (
+                  <label key={j}>
+                    <input
+                      type="checkbox"
+                      value={opt}
+                      checked={responses[i]?.includes(opt)}
+                      onChange={() => handleResponseChange(i, null, opt)}
+                    />
+                    {opt}
+                  </label>
+                ))}
             </div>
           ))}
-          <button onClick={submitSurvey}>Submit</button>
+          <button onClick={handleSubmit}>Submit</button>
+          {submitted && (
+            <div className="summary">
+              <h3>Survey Summary</h3>
+              <ul>
+                {questions.map((q, i) => (
+                  <li key={i}>
+                    <strong>{q.text}</strong>: {Array.isArray(responses[i])
+                      ? responses[i].join(', ')
+                      : responses[i] || 'No response'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -183,47 +264,68 @@ function App() {
 }
 
 export default App;
+
 ```
 ```
 App.css
 
-.app {
-  font-family: Arial, sans-serif;
-  padding: 20px;
-  background: linear-gradient(to right, #f0f8ff, #e6e6fa); 
+.App {
+  font-family: sans-serif;
+  padding: 2rem;
+  max-width: 800px;
+  margin: auto;
+  background: linear-gradient(to right, #57626e, #dceefb);
+}
+
+input, select, button {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  font-size: 1rem;
+  display: block;
+  width: 100%;
 }
 
 button {
-  margin: 10px 0;
-  color: blueviolet;
-  padding: 8px 16px;
-  background-color: #ffffff; 
+  background-color: #333;
+  color: white;
+  border: none;
+  cursor: pointer;
 }
 
-.input {
-  display: block;
-  margin: 5px 0 10px;
-  padding: 6px;
-  width: 300px;
-  background-color: #ebe6e6; 
+button:hover {
+  background-color: #555;
 }
 
-.build-mode, .fill-mode {
-  margin-top: 20px;
-  border: 1px solid #d62c2c;
-  padding: 20px;
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  margin-bottom: 1rem;
+}
+
+.question-block {
+  margin-bottom: 1.5rem;
+}
+
+.summary {
+  margin-top: 2rem;
+  background: #f4f4f4;
+  padding: 1rem;
   border-radius: 8px;
-  background: linear-gradient(to bottom, #ffe4e1, #561b1b); 
 }
+
 ```
 
 
 
 ## OUTPUT
 
-![Screenshot 2025-05-12 111519](https://github.com/user-attachments/assets/c24f5c58-d034-4dc8-9422-bf039c465ea5)
+![Screenshot 2025-05-12 133738](https://github.com/user-attachments/assets/2d91ec93-566b-43a0-8649-ec0df7683ee2)
 
-![Screenshot 2025-05-12 111530](https://github.com/user-attachments/assets/fc13ee15-3302-47ce-887d-8a4cbdcc2f04)
+![Screenshot 2025-05-12 133820](https://github.com/user-attachments/assets/bdcdf702-4132-401a-ba03-8402fefe7501)
+
 
 
 
